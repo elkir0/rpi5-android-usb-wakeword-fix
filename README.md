@@ -85,8 +85,8 @@ It includes:
 
 - runtime USB routing install and disable ZIPs;
 - patched audio APEX install ZIP;
-- stock audio APEX rollback ZIP for the exact tested build;
-- source, documentation, Apache-2.0 license and SHA-256 manifest.
+- a short compatibility/rollback guide, Apache-2.0 license and SHA-256
+  manifest.
 
 The package is **strictly build-specific**. The APEX installer accepts only the
 known stock APEX SHA-256
@@ -95,14 +95,18 @@ or the already patched APEX, and refuses an unknown build.
 
 ### Test order
 
-1. Have a working TWRP installation and a `/vendor` backup.
-2. Keep both rollback ZIPs accessible.
+1. Have a working TWRP installation.
+2. Make and verify a TWRP `/vendor` backup.
 3. Flash `install-usb-mic-boot-automation-rpi5.zip`.
 4. Flash `install-audio-apex-input-sync-rpi5.zip`.
 5. Reboot to System.
 
 Do not force the package onto another build. Rebuild and sign the APEX against
 the matching source tree instead.
+
+The public package does not redistribute the stock KonstaKANG APEX. Roll back
+by restoring the pre-install `/vendor` backup or reflashing the official
+matching KonstaKANG OTA obtained from its official source.
 
 ## Rebuild the Android 16 audio APEX
 

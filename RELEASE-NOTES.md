@@ -6,27 +6,29 @@ on a Raspberry Pi 5 running KonstaKANG LineageOS 23.2 / Android 16 build dated
 
 ## Asset
 
-`KonstaKANG-RPi5-USB-Wakeword-method-20260819.zip`
+`rpi5-android-usb-wakeword-fix-lineageos23.2-20260520-test1.zip`
 
 SHA-256:
 
 ```text
-092c3961eff400f2401525f5e5ea3729c607c561241538c08aa40067fdda646c
+dc9d2f0d5a28c4b9d4f7e53ef9462b21c81ee8323f0db7860cad82c15bdea78f
 ```
 
-The 12 MiB archive contains the source patch, runtime helper source, full
-documentation, Apache-2.0 license, per-file checksums and four nested TWRP
-packages:
+The 5.9 MiB archive contains a compatibility/rollback guide, Apache-2.0
+license, per-file checksums and three nested TWRP packages:
 
 - `install-usb-mic-boot-automation-rpi5.zip`
 - `disable-usb-mic-boot-automation-rpi5.zip`
 - `install-audio-apex-input-sync-rpi5.zip`
-- `restore-stock-audio-apex-rpi5.zip`
 
 ## Compatibility warning
 
 The audio APEX package is only for the exact tested build. Its installer checks
 the stock APEX SHA-256 and aborts on an unknown file. Do not bypass this check.
-Keep the rollback package and a `/vendor` backup available before testing.
+Keep a verified TWRP `/vendor` backup available before testing.
+
+No stock KonstaKANG APEX is redistributed. Roll back by restoring the
+pre-install TWRP `/vendor` backup or reflashing the official matching OTA from
+the official source.
 
 This is a pre-release test artifact, not an official KonstaKANG package.
