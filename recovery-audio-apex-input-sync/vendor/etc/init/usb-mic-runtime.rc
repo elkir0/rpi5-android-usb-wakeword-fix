@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# Apply volatile AudioSystem preferences only after Android has fully booted.
+# The synchronous input patch in the audio APEX replaces the old 20 ms period
+# workaround, so no ro.audio.usb.period_us override is needed here.
+service usb_mic_runtime /system/bin/sh /vendor/bin/usb-mic-runtime.sh
+    class late_start
+    user root
+    group root audio
+    disabled
+    oneshot
+    seclabel u:r:su:s0
+
+on property:sys.boot_completed=1
+    start usb_mic_runtime

@@ -1,0 +1,15 @@
+Raspberry Pi 5 Android USB Wakeword Fix
+Copyright 2026 elkir0
+
+The StreamAlsa.cpp modification applies to Android Open Source Project code:
+Copyright (C) 2023 The Android Open Source Project, licensed under the Apache
+License, Version 2.0. The patch backports the synchronous input architecture
+present in the Raspberry Vanilla Android 17 branch.
+
+The local runtime routing helper and its integration scripts are offered under
+the Apache License, Version 2.0, for review, testing and integration.
+
+Raspberry Pi is a trademark of Raspberry Pi Ltd. Android, Google, Gemini and
+Voice Match are trademarks of their respective owners. This project is not
+affiliated with or endorsed by Raspberry Pi Ltd., Google, LineageOS,
+Raspberry Vanilla or KonstaKANG.

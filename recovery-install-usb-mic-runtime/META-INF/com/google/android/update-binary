@@ -1,0 +1,54 @@
+#!/sbin/sh
+# SPDX-License-Identifier: Apache-2.0
+
+OUTFD="$2"
+ZIPFILE="$3"
+WORKDIR=/tmp/usb-mic-runtime-installer
+
+ui_print() {
+    echo "ui_print $1" > /proc/self/fd/$OUTFD
+    echo "ui_print" > /proc/self/fd/$OUTFD
+}
+
+abort_install() {
+    ui_print "ERREUR: $1"
+    exit 1
+}
+
+ui_print "Raspberry Pi 5 - routage automatique du micro USB"
+ui_print "Audio Policy XML ne sera pas modifiee."
+
+mount /vendor 2>/dev/null || true
+if [ ! -d /vendor/etc/init ] || [ ! -d /vendor/bin ]; then
+    abort_install "partition /vendor non montee"
+fi
+
+rm -rf "$WORKDIR"
+mkdir -p "$WORKDIR" || abort_install "creation du dossier temporaire"
+unzip -o "$ZIPFILE" 'payload/*' -d "$WORKDIR" >/dev/null 2>&1 || \
+    abort_install "extraction du payload"
+
+RC_FILE="$WORKDIR/payload/usb-mic-runtime.rc"
+RUNTIME_FILE="$WORKDIR/payload/usb-mic-runtime.sh"
+APK_FILE="$WORKDIR/payload/usb-mic-route.apk"
+
+if [ ! -s "$RC_FILE" ] || [ ! -s "$RUNTIME_FILE" ] || [ ! -s "$APK_FILE" ]; then
+    abort_install "payload incomplet"
+fi
+
+cp -f "$RC_FILE" /vendor/etc/init/usb-mic-runtime.rc || abort_install "copie du service init"
+cp -f "$RUNTIME_FILE" /vendor/bin/usb-mic-runtime.sh || abort_install "copie du script runtime"
+cp -f "$APK_FILE" /vendor/etc/usb-mic-route.apk || abort_install "copie du helper AudioSystem"
+
+chown 0:0 /vendor/etc/init/usb-mic-runtime.rc \
+    /vendor/bin/usb-mic-runtime.sh /vendor/etc/usb-mic-route.apk
+chmod 0644 /vendor/etc/init/usb-mic-runtime.rc /vendor/etc/usb-mic-route.apk
+chmod 0755 /vendor/bin/usb-mic-runtime.sh
+chcon u:object_r:vendor_configs_file:s0 /vendor/etc/init/usb-mic-runtime.rc 2>/dev/null || true
+chcon u:object_r:vendor_file:s0 /vendor/bin/usb-mic-runtime.sh 2>/dev/null || true
+chcon u:object_r:vendor_configs_file:s0 /vendor/etc/usb-mic-route.apk 2>/dev/null || true
+sync
+
+ui_print "Installation terminee. Redemarrez vers System."
+ui_print "Journal: /data/local/tmp/usb-mic-runtime.log"
+exit 0

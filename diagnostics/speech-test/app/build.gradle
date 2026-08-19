@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'local.raspberry.speechtest'
+    compileSdk 35
+    defaultConfig { applicationId 'local.raspberry.speechtest'; minSdk 28; targetSdk 35; versionCode 1; versionName '1.0' }
+}
