@@ -46,12 +46,17 @@ Android 16 l'architecture d'entrée présente dans Raspberry Vanilla Android 17 
 
 ## Fichiers et empreintes
 
-### Couche 1 — routage USB persistant
+Télécharger ensemble depuis la même release :
 
-| Archive | SHA-256 |
-|---|---|
-| `install-usb-mic-boot-automation-rpi5.zip` | `2c8c7cedfb1ba6317493739341381e7689768ae5570ee9d67acf70f4e6c6aaab` |
-| `disable-usb-mic-boot-automation-rpi5.zip` | `a9a12c566e4665ab1056573557e60359918b605923f6fd19563063bf9cb2ae9b` |
+- `install-rpi5-android-usb-wakeword-fix.zip` ;
+- `rollback-rpi5-android-usb-wakeword-fix.zip` ;
+- `SHA256SUMS`.
+
+Vérifier les deux ZIP avec `SHA256SUMS` avant de les copier. Le premier paquet
+regroupe les deux couches ci-dessous ; le second restaure la sauvegarde créée
+par l’installateur et retire le routage.
+
+### Couche 1 — routage USB persistant
 
 Le service règle le mixeur à 20/30 (`+18 dB`), active l'AGC et préfère l'USB
 pour :
@@ -66,20 +71,13 @@ pour :
 
 | Fichier | SHA-256 |
 |---|---|
-| `install-audio-apex-input-sync-rpi5.zip` | `8ab591acc6443b16be6419ae8f3cfa351b7d99071b3615af80a700500863a561` |
-| `restore-stock-audio-apex-rpi5.zip` | `f8abdec64b6667da4344a4f4b9302d85879a3449ff2ff850df9f2197ed371546` |
-| `artifacts/com.android.hardware.audio.rpi-input-sync.apex` | `1781c9c08197fdcc789350c71c759b9cdfe085683a93dad206037375908af0ff` |
+| APEX corrigé dans le ZIP | `1781c9c08197fdcc789350c71c759b9cdfe085683a93dad206037375908af0ff` |
 | APEX d'origine sauvegardé | `ccf26258c38acdb741566023eefff0a2f288d807f69439904f08ac319b831f9a` |
 
-Vérifier les téléchargements depuis la racine du dossier :
+Exemple de vérification :
 
 ```sh
-shasum -a 256 \
-  install-usb-mic-boot-automation-rpi5.zip \
-  disable-usb-mic-boot-automation-rpi5.zip \
-  install-audio-apex-input-sync-rpi5.zip \
-  restore-stock-audio-apex-rpi5.zip \
-  artifacts/com.android.hardware.audio.rpi-input-sync.apex
+shasum -a 256 -c SHA256SUMS
 ```
 
 ## Prérequis
@@ -99,28 +97,35 @@ adaptation.
 1. Copier les archives d'installation **et** de retour arrière :
 
    ```sh
-   adb push install-usb-mic-boot-automation-rpi5.zip /sdcard/Download/
-   adb push disable-usb-mic-boot-automation-rpi5.zip /sdcard/Download/
-   adb push install-audio-apex-input-sync-rpi5.zip /sdcard/Download/
-   adb push restore-stock-audio-apex-rpi5.zip /sdcard/Download/
+   adb push install-rpi5-android-usb-wakeword-fix.zip /sdcard/Download/
+   adb push rollback-rpi5-android-usb-wakeword-fix.zip /sdcard/Download/
    ```
 
 2. Redémarrer dans TWRP.
-3. Flasher `install-usb-mic-boot-automation-rpi5.zip`.
-4. Flasher `install-audio-apex-input-sync-rpi5.zip`.
-5. Redémarrer vers System.
+3. Flasher `install-rpi5-android-usb-wakeword-fix.zip`.
+4. Redémarrer vers System.
 
-L'installateur APEX :
+L'installateur unifié :
 
 - accepte uniquement l'APEX stock connu ou l'APEX déjà corrigé ;
-- vérifie le SHA-256 avant et après copie ;
-- retire l'ancien réglage de période 20 ms si l'ancien service est présent ;
-- conserve un état réinstallable sans effet cumulatif.
+- sauvegarde l’APEX stock sous `/data/local/tmp/rpi5-usb-wakeword-backup/` ;
+- refuse de continuer sans sauvegarde stock vérifiée ;
+- vérifie chaque payload avant et après copie ;
+- installe l’APEX, le service, le script et le helper dans une seule opération ;
+- refuse d’écraser un fichier de routage inconnu.
 
 ## Installation manuelle par ADB
 
 La méthode TWRP reste préférable. Cette section sert à reproduire précisément
-l'opération sur la build validée. Remplacer `SERIAL` par `IP:PORT`.
+l'opération sur la build validée. Remplacer `SERIAL` par `IP:PORT`. Extraire
+d’abord les payloads du ZIP public vérifié :
+
+```sh
+mkdir manual-payload
+cd manual-payload
+unzip ../install-rpi5-android-usb-wakeword-fix.zip 'payload/*'
+cd ..
+```
 
 ### 1. Installer le routage tardif
 
@@ -128,11 +133,11 @@ l'opération sur la build validée. Remplacer `SERIAL` par `IP:PORT`.
 adb -s SERIAL root
 adb -s SERIAL shell 'mount -o rw,remount /vendor'
 
-adb -s SERIAL push diagnostics/audio-policy/usb-mic-runtime.rc \
+adb -s SERIAL push manual-payload/payload/usb-mic-runtime.rc \
   /vendor/etc/init/usb-mic-runtime.rc
-adb -s SERIAL push diagnostics/audio-policy/usb-mic-runtime.sh \
+adb -s SERIAL push manual-payload/payload/usb-mic-runtime.sh \
   /vendor/bin/usb-mic-runtime.sh
-adb -s SERIAL push diagnostics/speech-test/app/build/outputs/apk/debug/app-debug.apk \
+adb -s SERIAL push manual-payload/payload/usb-mic-route.apk \
   /vendor/etc/usb-mic-route.apk
 
 adb -s SERIAL shell 'chown 0:0 \
@@ -150,7 +155,7 @@ adb -s SERIAL shell 'chown 0:0 \
 ### 2. Remplacer l'APEX atomiquement
 
 ```sh
-adb -s SERIAL push artifacts/com.android.hardware.audio.rpi-input-sync.apex \
+adb -s SERIAL push manual-payload/payload/com.android.hardware.audio.rpi.apex \
   /data/local/tmp/com.android.hardware.audio.rpi.apex
 
 adb -s SERIAL shell 'sha256sum \
@@ -168,7 +173,11 @@ ccf26258c38acdb741566023eefff0a2f288d807f69439904f08ac319b831f9a
 Ne pas continuer si l'APEX stock a une autre empreinte.
 
 ```sh
-adb -s SERIAL shell 'cp \
+adb -s SERIAL shell 'mkdir -p /data/local/tmp/rpi5-usb-wakeword-backup && \
+  cp /vendor/apex/com.android.hardware.audio.rpi.apex \
+     /data/local/tmp/rpi5-usb-wakeword-backup/com.android.hardware.audio.rpi.apex && \
+  sha256sum /data/local/tmp/rpi5-usb-wakeword-backup/com.android.hardware.audio.rpi.apex && \
+  cp \
   /data/local/tmp/com.android.hardware.audio.rpi.apex \
   /vendor/apex/com.android.hardware.audio.rpi.apex.new && \
   chown 0:0 /vendor/apex/com.android.hardware.audio.rpi.apex.new && \
@@ -242,22 +251,116 @@ Le bug de silence en fonctionnement normal est corrigé par l'APEX. Un autre
 problème peut toutefois apparaître pendant l'enrôlement : ce micro USB n'accepte
 qu'un flux de capture à la fois et le listener HOTWORD peut déjà l'occuper.
 
-Si l'écran d'entraînement n'écoute pas :
+### 1. Aligner la langue Android et celle de l'Assistant
+
+Faire ce réglage avant l'enrôlement. Pour utiliser le français de France :
 
 ```sh
-adb -s SERIAL shell "ps -A -o USER,PID,ARGS | grep -i 'gsa.hot'"
+adb -s SERIAL root
+adb -s SERIAL shell 'cmd locale set-device-locale fr-FR'
+adb -s SERIAL shell 'cmd locale get-device-locale; cmd activity get-config | head -n 1'
 ```
 
-Juste avant de relancer l'enregistrement, arrêter uniquement le PID isolé
-affiché en `u0_i...` :
+Les résultats attendus contiennent `fr-FR` et `fr-rFR`. L'interface Google doit
+alors afficher « Hey Google et Voice Match ». Cette commande change la langue
+de tout le système, pas uniquement celle de l'application Google.
+
+### 2. Vérifier le micro avant l'enrôlement
+
+Le routage HOTWORD doit viser le micro USB :
+
+```sh
+adb -s SERIAL shell 'dumpsys media.audio_policy' | sed -n '/Inputs (/,/Total Effects/p'
+```
+
+Sur le montage validé, on doit voir :
+
+```text
+AUDIO_FORMAT_PCM_16_BIT; 48000; Channel mask: 0x10
+Devices: AUDIO_DEVICE_IN_USB_DEVICE, @:card=3;device=0
+Source: 1999
+```
+
+### 3. Libérer temporairement l'unique flux USB
+
+Si l'écran d'entraînement n'écoute pas, préparer d'abord l'écran Voice Match,
+puis identifier le processus isolé du listener :
+
+```sh
+adb -s SERIAL shell \
+  "ps -A -o USER,PID,PPID,ARGS | grep -i 'gsa.hot' | grep -v grep"
+```
+
+Exemple réel :
+
+```text
+u0_i9004  5063  608  com.google.android.googlequicksearchbox:...:gsa.hot
+```
+
+Vérifier impérativement les deux conditions suivantes avant de continuer :
+
+- l'utilisateur commence par `u0_i` ;
+- la commande contient `com.google.android.googlequicksearchbox` et `gsa.hot`.
+
+Juste avant de toucher « Réentraîner l'empreinte vocale Voice Match », arrêter
+uniquement ce PID isolé :
 
 ```sh
 adb -s SERIAL root
 adb -s SERIAL shell kill -9 PID_ISOLE
 ```
 
-Revenir immédiatement à l'écran et prononcer les quatre phrases. Google recrée
-le listener ensuite. Cette manipulation concerne l'enrôlement seulement.
+Ne pas utiliser `pkill`, ne pas tuer tous les processus Google et ne pas tuer
+le processus `:interactor`. Revenir immédiatement à l'écran et prononcer les
+phrases affichées. Google recrée automatiquement le listener isolé ensuite.
+Cette manipulation concerne uniquement l'enrôlement.
+
+### 4. Confirmer que l'écran reçoit réellement la voix
+
+Pendant que l'écran écoute, contrôler AudioFlinger depuis un second terminal :
+
+```sh
+adb -s SERIAL shell 'dumpsys media.audio_flinger' | \
+  grep -A35 'Input thread' | head -n 80
+```
+
+Les indicateurs importants sont :
+
+- `Standby: no` ;
+- `Channel count: 1` ;
+- `Input device: AUDIO_DEVICE_IN_USB_DEVICE` ;
+- `Frames read` augmente ;
+- `Signal power history` contient des valeurs qui montent quand on parle ;
+- `readErrors=0` et aucune ligne `incomplete data received`.
+
+Le test Pi4 a lu plus de 600 000 frames pendant cette étape. Si `Frames read`
+reste à zéro, ce n'est pas un problème de Voice Match : il faut d'abord réparer
+le profil/routage USB ou le HAL.
+
+### 5. Réarmer le wakeword après l'enrôlement
+
+Une fois revenu à l'écran Voice Match :
+
+```sh
+adb -s SERIAL shell 'cmd voiceinteraction restart-detection'
+adb -s SERIAL shell 'dumpsys voiceinteraction' | \
+  grep -E 'Hotword detection connection|mPerformingSoftwareHotwordDetection'
+adb -s SERIAL shell 'dumpsys media.audio_policy' | \
+  sed -n '/Inputs (/,/Total Effects/p'
+```
+
+Le résultat attendu est `mPerformingSoftwareHotwordDetection=true`, avec une
+entrée active `AUDIO_SOURCE_HOTWORD` / source `1999` sur
+`AUDIO_DEVICE_IN_USB_DEVICE`.
+
+Enfin, vider le journal, prononcer « Hey Google », puis vérifier :
+
+```sh
+adb -s SERIAL shell logcat -c
+# Prononcer « Hey Google », puis :
+adb -s SERIAL shell logcat -d | grep -E \
+  'Fired hotword model|hotword score|Speaker Detected|speaker score|incomplete data received|read failed'
+```
 
 ## Recompiler l'APEX pour Android 16
 
@@ -332,7 +435,8 @@ diagnostics/speech-test/app/src/main/java/local/raspberry/speechtest/RouteMic.ja
 cd diagnostics/speech-test
 gradle :app:assembleDebug --no-daemon
 cd ../..
-./build-usb-mic-recovery-zips.sh
+APEX_PATH=/chemin/com.android.hardware.audio.rpi.apex \
+  ./scripts/build-release.sh
 ```
 
 Les appels internes
@@ -348,15 +452,14 @@ Pour réappliquer temporairement le routage pendant un diagnostic :
 ## Retour arrière
 
 1. Démarrer dans TWRP.
-2. Flasher `restore-stock-audio-apex-rpi5.zip`.
-3. Si le routage USB doit aussi être retiré, flasher
-   `disable-usb-mic-boot-automation-rpi5.zip`.
-4. Redémarrer vers System.
+2. Flasher `rollback-rpi5-android-usb-wakeword-fix.zip`.
+3. Redémarrer vers System.
 
-Ne pas modifier ou supprimer au hasard les XML audio : les anciens essais ont
-déjà provoqué une boucle sur les trois points de démarrage. Si nécessaire,
-`restore-audio-policy-rpi5.zip` restaure uniquement l'Audio Policy connue comme
-bootable pour cette image précise.
+Le rollback exige l’APEX stock sauvegardé par l’installateur, contrôle son hash
+et refuse de supprimer un fichier de routage qui ne correspond pas à la
+release. Si `/data` est perdu, restaurer la sauvegarde TWRP de `/vendor` ou
+reflasher l’OTA officiel exactement correspondant. Ne jamais modifier au
+hasard les XML audio : ils ne font pas partie du correctif Pi 5 final.
 
 ## Partager ou proposer le correctif en amont
 
@@ -373,9 +476,9 @@ La proposition peut contenir deux livrables complémentaires :
    livrable principal et permet à KonstaKANG de relire puis reconstruire l'APEX
    avec sa chaîne officielle.
 2. **Binaire de validation TWRP** :
-   `install-audio-apex-input-sync-rpi5.zip`, accompagné obligatoirement de
-   `restore-stock-audio-apex-rpi5.zip`. Il permet de reproduire immédiatement
-   le résultat sur la build exacte du 20 mai 2026.
+   `install-rpi5-android-usb-wakeword-fix.zip`, accompagné obligatoirement de
+   `rollback-rpi5-android-usb-wakeword-fix.zip`. Il permet de reproduire
+   immédiatement le résultat sur la build exacte du 20 mai 2026.
 
 Le ZIP TWRP de test doit être présenté comme **non officiel et strictement
 spécifique à la build testée**, avec ses SHA-256. Il ne doit jamais être forcé

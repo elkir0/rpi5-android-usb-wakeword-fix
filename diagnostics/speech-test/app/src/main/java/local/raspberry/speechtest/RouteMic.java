@@ -7,7 +7,6 @@ import android.media.AudioManager;
 import android.os.Looper;
 import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.util.Collections;
 
 /** One-shot root/app_process diagnostic to prefer the USB mic at runtime. */

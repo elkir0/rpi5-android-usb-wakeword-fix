@@ -1,0 +1,29 @@
+Raspberry Pi 5 Android USB wakeword fix - compatibilite
+========================================================
+
+Package experimental strictement reserve a :
+
+- Raspberry Pi 5 ;
+- KonstaKANG LineageOS 23.2 / Android 16 ;
+- build du 20 mai 2026, BUILD_ID BP4A.251205.006 ;
+- APEX stock SHA-256 :
+  ccf26258c38acdb741566023eefff0a2f288d807f69439904f08ac319b831f9a.
+
+Avant installation :
+
+1. conserver une sauvegarde TWRP verifiee de /vendor ;
+2. conserver les deux ZIP, installation et rollback ;
+3. ne jamais contourner une erreur de compatibilite ou de SHA-256.
+
+L'installateur sauvegarde l'APEX stock sous :
+
+  /data/local/tmp/rpi5-usb-wakeword-backup/
+
+Le ZIP de rollback utilise cette sauvegarde et retire le routage ajoute. Aucun
+APEX stock KonstaKANG n'est redistribue. Si la sauvegarde locale manque,
+restaurer /vendor dans TWRP ou reflasher l'OTA officiel exactement
+correspondant.
+
+Validation materielle : capture USB sans insertion de silence, readErrors=0,
+wakeword et verification du locuteur, reponse Assistant/Gemini, puis nouveau
+test concluant apres redemarrage a froid.

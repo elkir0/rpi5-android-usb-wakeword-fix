@@ -4,6 +4,7 @@
 local.properties
 
 # Build artifacts and private recovery material
+dist/
 *.apex
 *.img
 *.img.gz

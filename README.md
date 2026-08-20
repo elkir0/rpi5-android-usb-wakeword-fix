@@ -68,10 +68,14 @@ used by the final method.
 patches/                         Android 16 StreamAlsa source patch
 diagnostics/audio-policy/        late boot routing service and script
 diagnostics/speech-test/         source for the AudioSystem routing helper
-recovery-*/META-INF/             source for the TWRP installers
+recovery/install/                source of the guarded TWRP installer
+recovery/rollback/               source of the guarded TWRP rollback
 docs/TUTORIEL-FR.md              full investigation and procedure in French
+docs/BUILD-FR.md                 reproducible APEX build instructions
+docs/VOICE-MATCH-FR.md           single-capture enrollment procedure
+docs/PROVENANCE-FR.md            commits, signatures and hardware evidence
 apply-usb-mic-runtime.sh         temporary ADB diagnostic helper
-build-usb-mic-recovery-zips.sh   runtime TWRP package builder
+scripts/build-release.sh         release ZIP builder and verifier
 ```
 
 Compiled APEX files, Android images, backups, GApps, Widevine, recordings and
@@ -81,12 +85,15 @@ signing material are intentionally excluded from Git history.
 
 The exact package tested on the device is available from the
 [GitHub Releases page](https://github.com/elkir0/rpi5-android-usb-wakeword-fix/releases).
-It includes:
+The current package contains two self-contained files:
 
-- runtime USB routing install and disable ZIPs;
-- patched audio APEX install ZIP;
-- a short compatibility/rollback guide, Apache-2.0 license and SHA-256
-  manifest.
+- `install-rpi5-android-usb-wakeword-fix.zip`, which installs the patched APEX
+  and persistent USB routing and saves the stock APEX under `/data` first;
+- `rollback-rpi5-android-usb-wakeword-fix.zip`, which restores that verified
+  stock backup and removes only files whose hashes are accepted.
+
+The release bundle also contains a compatibility guide, Apache-2.0 license and
+per-file SHA-256 manifest.
 
 The package is **strictly build-specific**. The APEX installer accepts only the
 known stock APEX SHA-256
@@ -97,16 +104,17 @@ or the already patched APEX, and refuses an unknown build.
 
 1. Have a working TWRP installation.
 2. Make and verify a TWRP `/vendor` backup.
-3. Flash `install-usb-mic-boot-automation-rpi5.zip`.
-4. Flash `install-audio-apex-input-sync-rpi5.zip`.
-5. Reboot to System.
+3. Flash `install-rpi5-android-usb-wakeword-fix.zip`.
+4. Reboot to System.
 
 Do not force the package onto another build. Rebuild and sign the APEX against
 the matching source tree instead.
 
-The public package does not redistribute the stock KonstaKANG APEX. Roll back
-by restoring the pre-install `/vendor` backup or reflashing the official
-matching KonstaKANG OTA obtained from its official source.
+The public package does not redistribute the stock KonstaKANG APEX. The
+installer copies the known stock file already present on the device to
+`/data/local/tmp/rpi5-usb-wakeword-backup/`; the rollback ZIP restores only
+that hash-checked copy. The verified TWRP `/vendor` backup remains the recovery
+path if `/data` is lost.
 
 ## Rebuild the Android 16 audio APEX
 
@@ -133,7 +141,7 @@ repo sync
 Apply and build:
 
 ```sh
-git -C device/brcm/rpi5 checkout \
+git -C device/brcm/rpi5 checkout --detach \
   8a59d09024b7fba6a7bce619e178c8c0d8e87c7d
 git -C device/brcm/rpi5 apply \
   /path/to/patches/0002-audio-alsa-read-input-synchronously.patch
@@ -153,7 +161,9 @@ versions or package names alone is not sufficient.
 cd diagnostics/speech-test
 gradle :app:assembleDebug --no-daemon
 cd ../..
-./build-usb-mic-recovery-zips.sh
+APEX_PATH=/path/to/com.android.hardware.audio.rpi.apex \
+ROUTE_APK_PATH=diagnostics/speech-test/app/build/outputs/apk/debug/app-debug.apk \
+  ./scripts/build-release.sh
 ```
 
 On another Android version, verify the hidden API signatures used by
@@ -181,7 +191,20 @@ Expected results include:
 - no repeated 240-frame inserted-silence warning.
 
 The complete install, enrollment, validation and rollback notes are in
-[`docs/TUTORIEL-FR.md`](docs/TUTORIEL-FR.md).
+[`docs/TUTORIEL-FR.md`](docs/TUTORIEL-FR.md). Reproducible build inputs are in
+[`docs/BUILD-FR.md`](docs/BUILD-FR.md), Voice Match safeguards in
+[`docs/VOICE-MATCH-FR.md`](docs/VOICE-MATCH-FR.md), and artifact evidence in
+[`docs/PROVENANCE-FR.md`](docs/PROVENANCE-FR.md).
+
+## Guided setup application
+
+The separate open-source
+[Raspberry Voice Setup](https://github.com/elkir0/rpi-android-voice-setup)
+application detects the Pi generation and known hashes, measures the real USB
+signal, launches Google speech recognition and guides the special Voice Match
+enrollment. Its computer-side ADB companion only stops a listener after strict
+process checks and explicit confirmation. The manual commands remain in this
+repository, so the system fix does not depend on that application.
 
 ## License and redistribution
 

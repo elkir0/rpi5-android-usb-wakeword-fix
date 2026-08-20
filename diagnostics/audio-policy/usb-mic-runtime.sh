@@ -1,5 +1,4 @@
 #!/system/bin/sh
-# SPDX-License-Identifier: Apache-2.0
 
 # Late, non-blocking runtime setup for the HNHK USB microphone. This does not
 # edit Audio Policy XML. All AudioSystem preferences disappear on reboot.

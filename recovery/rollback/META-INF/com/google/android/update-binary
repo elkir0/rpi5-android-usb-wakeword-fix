@@ -1,0 +1,108 @@
+#!/sbin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Hash placeholders are replaced by scripts/build-release.sh.
+
+OUTFD="$2"
+BACKUP_DIR=/data/local/tmp/rpi5-usb-wakeword-backup
+APEX_NAME=com.android.hardware.audio.rpi.apex
+
+STOCK_APEX_SHA256=@STOCK_APEX_SHA256@
+PATCHED_APEX_SHA256=@PATCHED_APEX_SHA256@
+RC_SHA256=@RC_SHA256@
+RUNTIME_SHA256=@RUNTIME_SHA256@
+APK_SHA256=@APK_SHA256@
+PREVIOUS_RC_SHA256=14173fd9cd4628b6c523fb49f08b46af4b133dde690e04163faa6792df4ef629
+LEGACY_PERIOD_RC_SHA256=54beffd16727beca0bd753e95124e8aa25ec48a3b4e4af61922ca34fa2d04ae3
+PREVIOUS_RUNTIME_SHA256=20e69c779b4ffe81f2f53e961703c8b4faf555f61081a0c902669060bbe1a349
+PREVIOUS_APK_SHA256=77d3c3865f3b97b986d3cc190969a2754b4bf4eac838f2333618250e937ecd90
+
+ui_print() {
+    echo "ui_print $1" > "/proc/self/fd/$OUTFD"
+    echo "ui_print" > "/proc/self/fd/$OUTFD"
+}
+
+abort_install() {
+    ui_print "ERREUR: $1"
+    exit 1
+}
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d ' ' -f 1
+    elif command -v busybox >/dev/null 2>&1; then
+        busybox sha256sum "$1" | cut -d ' ' -f 1
+    elif command -v toybox >/dev/null 2>&1; then
+        toybox sha256sum "$1" | cut -d ' ' -f 1
+    else
+        return 1
+    fi
+}
+
+verify_hash() {
+    actual=$(sha256_file "$1") || abort_install "outil SHA-256 indisponible"
+    [ "$actual" = "$2" ] || abort_install "empreinte incorrecte: $1"
+}
+
+verify_removable() {
+    path=$1
+    expected=$2
+    shift 2
+    [ ! -e "$path" ] && return 0
+    current=$(sha256_file "$path") || abort_install "calcul SHA-256 impossible: $path"
+    [ "$current" = "$expected" ] && return 0
+    for accepted in "$@"; do
+        [ -n "$accepted" ] && [ "$current" = "$accepted" ] && return 0
+    done
+    abort_install "refus de supprimer un fichier inconnu: $path"
+}
+
+ui_print "Raspberry Pi 5 - retour arriere micro USB/HOTWORD"
+mount /vendor 2>/dev/null || true
+mount -o rw,remount /vendor 2>/dev/null || true
+mount /data 2>/dev/null || true
+[ -d /vendor/apex ] || abort_install "partition /vendor non montee"
+[ -d /data ] || abort_install "partition /data non montee"
+
+CURRENT_APEX=/vendor/apex/$APEX_NAME
+STOCK_BACKUP=$BACKUP_DIR/$APEX_NAME
+[ -s "$CURRENT_APEX" ] || abort_install "APEX audio actuel absent"
+current_apex_sha256=$(sha256_file "$CURRENT_APEX") || \
+    abort_install "calcul SHA-256 APEX impossible"
+case "$current_apex_sha256" in
+    "$STOCK_APEX_SHA256") restore_apex=false ;;
+    "$PATCHED_APEX_SHA256") restore_apex=true ;;
+    *) abort_install "APEX actuel inconnu; restauration refusee" ;;
+esac
+
+if [ "$restore_apex" = true ]; then
+    [ -s "$STOCK_BACKUP" ] || abort_install "sauvegarde APEX stock absente"
+    verify_hash "$STOCK_BACKUP" "$STOCK_APEX_SHA256"
+fi
+verify_removable /vendor/etc/init/usb-mic-runtime.rc "$RC_SHA256" \
+    "$PREVIOUS_RC_SHA256" "$LEGACY_PERIOD_RC_SHA256"
+verify_removable /vendor/bin/usb-mic-runtime.sh "$RUNTIME_SHA256" \
+    "$PREVIOUS_RUNTIME_SHA256"
+verify_removable /vendor/etc/usb-mic-route.apk "$APK_SHA256" \
+    "$PREVIOUS_APK_SHA256"
+
+if [ "$restore_apex" = true ]; then
+    cp -f "$STOCK_BACKUP" "$CURRENT_APEX.new" || \
+        abort_install "copie temporaire APEX stock impossible"
+    chown 0:0 "$CURRENT_APEX.new"
+    chmod 0644 "$CURRENT_APEX.new"
+    restorecon "$CURRENT_APEX.new" 2>/dev/null || \
+        chcon u:object_r:vendor_file:s0 "$CURRENT_APEX.new" 2>/dev/null || true
+    verify_hash "$CURRENT_APEX.new" "$STOCK_APEX_SHA256"
+    mv -f "$CURRENT_APEX.new" "$CURRENT_APEX" || \
+        abort_install "restauration APEX impossible"
+fi
+
+rm -f /vendor/etc/init/usb-mic-runtime.rc
+rm -f /vendor/bin/usb-mic-runtime.sh
+rm -f /vendor/etc/usb-mic-route.apk
+verify_hash "$CURRENT_APEX" "$STOCK_APEX_SHA256"
+sync
+ui_print "Retour arriere termine et verifie."
+ui_print "La sauvegarde APEX est conservee sous /data."
+ui_print "Redemarrez maintenant vers System."
+exit 0

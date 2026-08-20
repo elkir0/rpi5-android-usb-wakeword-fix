@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: Apache-2.0
-
 # Apply volatile AudioSystem preferences only after Android has fully booted.
 # The synchronous input patch in the audio APEX replaces the old 20 ms period
 # workaround, so no ro.audio.usb.period_us override is needed here.
